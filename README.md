@@ -208,5 +208,3 @@ This project is open source and available under the [MIT License](LICENSE).
 For support and questions, please open an issue in the repository.
 
 ---
-
-**🎉 Enjoy your professional Camera Admin Dashboard with Ant Design!**

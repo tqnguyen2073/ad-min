@@ -47,6 +47,13 @@ const CameraManagement: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [loading, setLoading] = useState(false);
 
+  const handleRefresh = () => {
+    setLoading(true);
+    setTimeout(() => {
+      setLoading(false);
+    }, 2000); // 2000 ms = 2 seconds
+  };
+
   // Mock camera data
   const cameras: Camera[] = [
     {
@@ -147,7 +154,7 @@ const CameraManagement: React.FC = () => {
       </Menu.Item>
     </Menu>
   );
-
+  
   const columns = [
     {
       title: 'Camera',
@@ -232,7 +239,7 @@ const CameraManagement: React.FC = () => {
       ),
     },
   ];
-
+  
   const filteredData = cameras.filter(camera => {
     const matchesSearch = 
       camera.name.toLowerCase().includes(searchText.toLowerCase()) ||
@@ -255,7 +262,7 @@ const CameraManagement: React.FC = () => {
         <Space>
           <Button 
             icon={<ReloadOutlined />} 
-            onClick={() => setLoading(true)}
+            onClick={handleRefresh}
             loading={loading}
           >
             Refresh

@@ -12,7 +12,7 @@ import {
   Title,
 } from 'chart.js';
 import { 
-  Card, 
+  Card,
   Row, 
   Col, 
   Statistic, 
