@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Table, 
   Input, 
@@ -12,7 +12,11 @@ import {
   Badge,
   Avatar,
   Dropdown,
-  Menu
+  Menu,
+  Modal,
+  Form,
+  message,
+  notification
 } from 'antd';
 import { 
   PlusOutlined,
@@ -33,84 +37,118 @@ const { Search } = Input;
 const { Option } = Select;
 
 interface Camera {
-  id: string;
+  camera_id: string;
+  camera_name: string;
+}
+
+interface AddCameraForm {
   name: string;
   location: string;
-  status: 'online' | 'offline' | 'maintenance';
   ip: string;
-  lastSeen: string;
-  recording: boolean;
 }
+
+const API_BASE_URL = 'http://localhost:3636/api';
 
 const CameraManagement: React.FC = () => {
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [loading, setLoading] = useState(false);
+  const [cameras, setCameras] = useState<Camera[]>([]);
+  const [isAddModalVisible, setIsAddModalVisible] = useState(false);
+  const [addCameraForm] = Form.useForm();
+  const [addingCamera, setAddingCamera] = useState(false);
 
-  const handleRefresh = () => {
+  // Fetch cameras from API
+  const fetchCameras = async () => {
     setLoading(true);
-    setTimeout(() => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/cameras`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      setCameras(data);
+    } catch (error) {
+      console.error('Error fetching cameras:', error);
+      message.error('Failed to fetch cameras from server');
+      // Fallback to empty array if API is not available
+      setCameras([]);
+    } finally {
       setLoading(false);
-    }, 2000); // 2000 ms = 2 seconds
+    }
   };
 
-  // Mock camera data
-  const cameras: Camera[] = [
-    {
-      id: 'CAM-001',
-      name: 'Front Entrance',
-      location: 'Building A - Main Entrance',
-      status: 'online',
-      ip: '192.168.1.101',
-      lastSeen: '2 minutes ago',
-      recording: true,
-    },
-    {
-      id: 'CAM-002',
-      name: 'Parking Lot',
-      location: 'Building A - Parking Area',
-      status: 'online',
-      ip: '192.168.1.102',
-      lastSeen: '1 minute ago',
-      recording: true,
-    },
-    {
-      id: 'CAM-003',
-      name: 'Back Door',
-      location: 'Building A - Rear Exit',
-      status: 'offline',
-      ip: '192.168.1.103',
-      lastSeen: '1 hour ago',
-      recording: false,
-    },
-    {
-      id: 'CAM-004',
-      name: 'Lobby',
-      location: 'Building A - Main Lobby',
-      status: 'online',
-      ip: '192.168.1.104',
-      lastSeen: '30 seconds ago',
-      recording: true,
-    },
-    {
-      id: 'CAM-005',
-      name: 'Server Room',
-      location: 'Building B - IT Department',
-      status: 'maintenance',
-      ip: '192.168.1.105',
-      lastSeen: '5 minutes ago',
-      recording: false,
-    },
-    {
-      id: 'CAM-006',
-      name: 'Loading Dock',
-      location: 'Building B - Loading Area',
-      status: 'online',
-      ip: '192.168.1.106',
-      lastSeen: '45 seconds ago',
-      recording: true,
-    },
-  ];
+  // Add new camera
+  const addCamera = async (values: AddCameraForm) => {
+    setAddingCamera(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/cameras`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          camera_name: values.name,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const newCamera = await response.json();
+      setCameras(prev => [...prev, newCamera]);
+      message.success('Camera added successfully');
+      setIsAddModalVisible(false);
+      addCameraForm.resetFields();
+    } catch (error) {
+      console.error('Error adding camera:', error);
+      message.error('Failed to add camera');
+    } finally {
+      setAddingCamera(false);
+    }
+  };
+
+  // Delete camera
+  const deleteCamera = async (cameraId: string) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/cameras/${cameraId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      setCameras(prev => prev.filter(camera => camera.camera_id !== cameraId));
+      message.success('Camera deleted successfully');
+    } catch (error) {
+      console.error('Error deleting camera:', error);
+      message.error('Failed to delete camera');
+    }
+  };
+
+  // Load cameras on component mount
+  useEffect(() => {
+    fetchCameras();
+  }, []);
+
+  const handleRefresh = () => {
+    fetchCameras();
+  };
+
+  const handleAddCamera = () => {
+    setIsAddModalVisible(true);
+  };
+
+  const handleAddModalOk = () => {
+    addCameraForm.submit();
+  };
+
+  const handleAddModalCancel = () => {
+    setIsAddModalVisible(false);
+    addCameraForm.resetFields();
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -126,6 +164,9 @@ const CameraManagement: React.FC = () => {
   };
 
   const getStatusBadge = (status: string) => {
+    if (!status) {
+      return <Badge status="default" text="Unknown" />;
+    }
     return (
       <Badge 
         status={getStatusColor(status) as any} 
@@ -139,8 +180,8 @@ const CameraManagement: React.FC = () => {
       <Menu.Item key="view" icon={<EyeOutlined />}>
         View Camera
       </Menu.Item>
-      <Menu.Item key="play" icon={record.recording ? <PauseCircleOutlined /> : <PlayCircleOutlined />}>
-        {record.recording ? 'Pause Recording' : 'Start Recording'}
+      <Menu.Item key="play" icon={<PlayCircleOutlined />}>
+        Start Recording
       </Menu.Item>
       <Menu.Item key="settings" icon={<SettingOutlined />}>
         Settings
@@ -149,7 +190,21 @@ const CameraManagement: React.FC = () => {
         Edit
       </Menu.Item>
       <Menu.Divider />
-      <Menu.Item key="delete" icon={<DeleteOutlined />} danger>
+      <Menu.Item 
+        key="delete" 
+        icon={<DeleteOutlined />} 
+        danger
+        onClick={() => {
+          Modal.confirm({
+            title: 'Delete Camera',
+            content: `Are you sure you want to delete camera "${record.camera_name || 'Unnamed Camera'}"?`,
+            okText: 'Delete',
+            okType: 'danger',
+            cancelText: 'Cancel',
+            onOk: () => deleteCamera(record.camera_id),
+          });
+        }}
+      >
         Delete
       </Menu.Item>
     </Menu>
@@ -158,12 +213,12 @@ const CameraManagement: React.FC = () => {
   const columns = [
     {
       title: 'Camera',
-      dataIndex: 'name',
-      key: 'name',
+      dataIndex: 'camera_name',
+      key: 'camera_name',
       render: (text: string, record: Camera) => (
         <Space direction="vertical" size={0}>
-          <Text strong>{text}</Text>
-          <Text type="secondary" className="text-xs">{record.location}</Text>
+          <Text strong>{text || 'Unnamed Camera'}</Text>
+          <Text type="secondary" className="text-xs">Unknown Location</Text>
         </Space>
       ),
     },
@@ -171,33 +226,33 @@ const CameraManagement: React.FC = () => {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
-      render: (status: string) => getStatusBadge(status),
+      render: () => <Badge status="default" text="Unknown" />,
       filters: [
         { text: 'Online', value: 'online' },
         { text: 'Offline', value: 'offline' },
         { text: 'Maintenance', value: 'maintenance' },
       ],
-      onFilter: (value: boolean | React.Key, record: Camera) => record.status === value,
+      onFilter: () => true,
     },
     {
       title: 'IP Address',
       dataIndex: 'ip',
       key: 'ip',
-      render: (text: string) => <Text code>{text}</Text>,
+      render: () => <Text code>Unknown</Text>,
     },
     {
       title: 'Last Seen',
       dataIndex: 'lastSeen',
       key: 'lastSeen',
-      render: (text: string) => <Text type="secondary">{text}</Text>,
+      render: () => <Text type="secondary">Unknown</Text>,
     },
     {
       title: 'Recording',
       dataIndex: 'recording',
       key: 'recording',
-      render: (recording: boolean) => (
-        <Tag color={recording ? 'success' : 'default'}>
-          {recording ? 'Yes' : 'No'}
+      render: () => (
+        <Tag color="default">
+          Unknown
         </Tag>
       ),
     },
@@ -213,12 +268,12 @@ const CameraManagement: React.FC = () => {
               size="small"
             />
           </Tooltip>
-          <Tooltip title={record.recording ? 'Pause Recording' : 'Start Recording'}>
+          <Tooltip title="Start Recording">
             <Button 
               type="text" 
-              icon={record.recording ? <PauseCircleOutlined /> : <PlayCircleOutlined />}
+              icon={<PlayCircleOutlined />}
               size="small"
-              style={{ color: record.recording ? '#ff4d4f' : '#52c41a' }}
+              style={{ color: '#52c41a' }}
             />
           </Tooltip>
           <Tooltip title="Settings">
@@ -242,10 +297,8 @@ const CameraManagement: React.FC = () => {
   
   const filteredData = cameras.filter(camera => {
     const matchesSearch = 
-      camera.name.toLowerCase().includes(searchText.toLowerCase()) ||
-      camera.location.toLowerCase().includes(searchText.toLowerCase()) ||
-      camera.ip.includes(searchText);
-    const matchesStatus = statusFilter === 'all' || camera.status === statusFilter;
+      (camera.camera_name?.toLowerCase() || '').includes(searchText.toLowerCase());
+    const matchesStatus = statusFilter === 'all'; // Since we don't have status data, show all
     return matchesSearch && matchesStatus;
   });
 
@@ -270,6 +323,7 @@ const CameraManagement: React.FC = () => {
           <Button 
             type="primary" 
             icon={<PlusOutlined />}
+            onClick={handleAddCamera}
           >
             Add Camera
           </Button>
@@ -309,7 +363,7 @@ const CameraManagement: React.FC = () => {
         <Table
           columns={columns}
           dataSource={filteredData}
-          rowKey="id"
+          rowKey="camera_id"
           loading={loading}
           pagination={{
             total: filteredData.length,
@@ -320,8 +374,64 @@ const CameraManagement: React.FC = () => {
               `${range[0]}-${range[1]} of ${total} cameras`,
           }}
           scroll={{ x: 1000 }}
+          locale={{
+            emptyText: 'No cameras found. Add your first camera to get started.',
+          }}
         />
       </Card>
+
+      {/* Add Camera Modal */}
+      <Modal
+        title="Add New Camera"
+        open={isAddModalVisible}
+        onOk={handleAddModalOk}
+        onCancel={handleAddModalCancel}
+        confirmLoading={addingCamera}
+        okText="Add Camera"
+        cancelText="Cancel"
+      >
+        <Form
+          form={addCameraForm}
+          layout="vertical"
+          onFinish={addCamera}
+        >
+          <Form.Item
+            name="name"
+            label="Camera Name"
+            rules={[
+              { required: true, message: 'Please enter camera name' },
+              { min: 2, message: 'Camera name must be at least 2 characters' }
+            ]}
+          >
+            <Input placeholder="Enter camera name" />
+          </Form.Item>
+          
+          <Form.Item
+            name="location"
+            label="Location"
+            rules={[
+              { required: true, message: 'Please enter camera location' },
+              { min: 2, message: 'Location must be at least 2 characters' }
+            ]}
+          >
+            <Input placeholder="Enter camera location" />
+          </Form.Item>
+          
+          <Form.Item
+            name="ip"
+            label="IP Address"
+            rules={[
+              { required: true, message: 'Please enter IP address' },
+              { 
+                pattern: /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/,
+                message: 'Please enter a valid IP address'
+              }
+            ]}
+          >
+            <Input placeholder="Enter IP address (e.g., 192.168.1.100)" />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 };
