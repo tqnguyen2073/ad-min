@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Table, 
   Input, 
@@ -9,7 +9,6 @@ import {
   Space, 
   Tag, 
   Tooltip,
-  Badge,
   Dropdown,
   Menu,
   Modal,
@@ -47,6 +46,13 @@ interface Camera {
   camera_id: string;
   camera_name: string;
   created_at?: string;
+  ipaddress?: string; // This is the IP from the location table
+  location_name?: string;
+}
+
+interface Location {
+  location_name: string;
+  ipaddress: string;
 }
 
 const CameraManagement: React.FC = () => {
@@ -56,6 +62,22 @@ const CameraManagement: React.FC = () => {
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
   const [isLogsModalVisible, setIsLogsModalVisible] = useState(false);
   const [addCameraForm] = Form.useForm<AddCameraForm>();
+  const [locations, setLocations] = useState<Location[]>([]);
+
+  useEffect(() => {
+    // Fetch all locations on mount
+    const fetchLocations = async () => {
+      try {
+        const response = await fetch('http://localhost:3636/api/locations');
+        if (!response.ok) throw new Error('Failed to fetch locations');
+        const data = await response.json();
+        setLocations(data);
+      } catch (err) {
+        setLocations([]);
+      }
+    };
+    fetchLocations();
+  }, []);
 
   const handleRefresh = () => {
     fetchCameras();
@@ -84,31 +106,6 @@ const CameraManagement: React.FC = () => {
     addCameraForm.resetFields();
   };
 
-
-
-  const getStatusTag = (status: string) => {
-    switch (status) {
-      case 'success':
-        return <Tag color="success">Success</Tag>;
-      case 'warning':
-        return <Tag color="warning">Warning</Tag>;
-      case 'error':
-        return <Tag color="error">Error</Tag>;
-      default:
-        return <Tag>Info</Tag>;
-    }
-  };
-
-  const formatTimeAgo = (dateString: string) => {
-    const now = new Date();
-    const date = new Date(dateString);
-    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
-    
-    if (diffInMinutes < 1) return 'Just now';
-    if (diffInMinutes < 60) return `${diffInMinutes} minutes ago`;
-    if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)} hours ago`;
-    return `${Math.floor(diffInMinutes / 1440)} days ago`;
-  };
 
   const formatDateTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -158,43 +155,17 @@ const CameraManagement: React.FC = () => {
       render: (text: string, record: Camera) => (
         <Space direction="vertical" size={0}>
           <Text strong>{text || 'Unnamed Camera'}</Text>
-          <Text type="secondary" className="text-xs">Unknown Location</Text>
+          <Text type="secondary" className="text-xs">{record.location_name || 'Unknown Location'}</Text>
         </Space>
       ),
     },
     {
-      title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
-      render: () => <Badge status="default" text="Unknown" />,
-      filters: [
-        { text: 'Online', value: 'online' },
-        { text: 'Offline', value: 'offline' },
-        { text: 'Maintenance', value: 'maintenance' },
-      ],
-      onFilter: () => true,
-    },
-    {
       title: 'IP Address',
-      dataIndex: 'ip',
-      key: 'ip',
-      render: () => <Text code>Unknown</Text>,
-    },
-    {
-      title: 'Last Seen',
-      dataIndex: 'lastSeen',
-      key: 'lastSeen',
-      render: () => <Text type="secondary">Unknown</Text>,
-    },
-    {
-      title: 'Recording',
-      dataIndex: 'recording',
-      key: 'recording',
-      render: () => (
-        <Tag color="default">
-          Unknown
-        </Tag>
-      ),
+      key: 'ipaddress',
+      render: (_: any, record: Camera) => {
+        const location = locations.find(loc => loc.location_name === record.location_name);
+        return <Text code>{location?.ipaddress || 'Unknown'}</Text>;
+      },
     },
     {
       title: 'Actions',

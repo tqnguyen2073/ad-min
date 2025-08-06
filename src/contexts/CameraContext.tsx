@@ -5,6 +5,8 @@ interface Camera {
   camera_id: string;
   camera_name: string;
   created_at?: string;
+  ipaddress?: string;
+  location_name?: string;
 }
 
 interface CameraLog {
@@ -114,7 +116,12 @@ export const CameraProvider: React.FC<CameraProviderProps> = ({ children }) => {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const data = await response.json();
-      setCameras(data);
+      // Ensure each camera has ipaddress and location_name
+      setCameras(data.map((cam: any) => ({
+        ...cam,
+        ipaddress: cam.ipaddress || '',
+        location_name: cam.location_name || '',
+      })));
     } catch (error) {
       console.error('Error fetching cameras:', error);
       setCameras([]);
@@ -134,6 +141,8 @@ export const CameraProvider: React.FC<CameraProviderProps> = ({ children }) => {
         },
         body: JSON.stringify({
           camera_name: values.name,
+          ipaddress: values.ip,
+          location_name: values.location,
         }),
       });
 
@@ -142,7 +151,11 @@ export const CameraProvider: React.FC<CameraProviderProps> = ({ children }) => {
       }
 
       const newCamera = await response.json();
-      setCameras(prev => [...prev, newCamera]);
+      setCameras(prev => [...prev, {
+        ...newCamera,
+        ipaddress: newCamera.ipaddress || '',
+        location_name: newCamera.location_name || '',
+      }]);
       message.success('Camera added successfully');
 
       // Add to recent activity and logs in memory
