@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { CameraProvider } from './contexts/CameraContext';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import CameraManagement from './components/CameraManagement';
@@ -22,7 +23,9 @@ const App: React.FC = () => {
               path="/"
               element={
                 <PrivateRoute>
-                  <Layout />
+                  <CameraProvider>
+                    <Layout />
+                  </CameraProvider>
                 </PrivateRoute>
               }
             >

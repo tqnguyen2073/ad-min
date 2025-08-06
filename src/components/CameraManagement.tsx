@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   Table, 
   Input, 
@@ -10,13 +10,11 @@ import {
   Tag, 
   Tooltip,
   Badge,
-  Avatar,
   Dropdown,
   Menu,
   Modal,
   Form,
-  message,
-  notification
+  List
 } from 'antd';
 import { 
   PlusOutlined,
@@ -24,22 +22,20 @@ import {
   FilterOutlined,
   EyeOutlined,
   PlayCircleOutlined,
-  PauseCircleOutlined,
   SettingOutlined,
   EditOutlined,
   DeleteOutlined,
   MoreOutlined,
-  ReloadOutlined
+  ReloadOutlined,
+  FileTextOutlined,
+  ClockCircleOutlined,
+  CalendarOutlined
 } from '@ant-design/icons';
+import { useCamera } from '../contexts/CameraContext';
 
 const { Title, Text } = Typography;
 const { Search } = Input;
 const { Option } = Select;
-
-interface Camera {
-  camera_id: string;
-  camera_name: string;
-}
 
 interface AddCameraForm {
   name: string;
@@ -47,91 +43,19 @@ interface AddCameraForm {
   ip: string;
 }
 
-const API_BASE_URL = 'http://localhost:3636/api';
+interface Camera {
+  camera_id: string;
+  camera_name: string;
+  created_at?: string;
+}
 
 const CameraManagement: React.FC = () => {
+  const { cameras, recentActivity, logs, loading, addingCamera, fetchCameras, addCamera, deleteCamera } = useCamera();
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [loading, setLoading] = useState(false);
-  const [cameras, setCameras] = useState<Camera[]>([]);
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
-  const [addCameraForm] = Form.useForm();
-  const [addingCamera, setAddingCamera] = useState(false);
-
-  // Fetch cameras from API
-  const fetchCameras = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch(`${API_BASE_URL}/cameras`);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const data = await response.json();
-      setCameras(data);
-    } catch (error) {
-      console.error('Error fetching cameras:', error);
-      message.error('Failed to fetch cameras from server');
-      // Fallback to empty array if API is not available
-      setCameras([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Add new camera
-  const addCamera = async (values: AddCameraForm) => {
-    setAddingCamera(true);
-    try {
-      const response = await fetch(`${API_BASE_URL}/cameras`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          camera_name: values.name,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const newCamera = await response.json();
-      setCameras(prev => [...prev, newCamera]);
-      message.success('Camera added successfully');
-      setIsAddModalVisible(false);
-      addCameraForm.resetFields();
-    } catch (error) {
-      console.error('Error adding camera:', error);
-      message.error('Failed to add camera');
-    } finally {
-      setAddingCamera(false);
-    }
-  };
-
-  // Delete camera
-  const deleteCamera = async (cameraId: string) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/cameras/${cameraId}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      setCameras(prev => prev.filter(camera => camera.camera_id !== cameraId));
-      message.success('Camera deleted successfully');
-    } catch (error) {
-      console.error('Error deleting camera:', error);
-      message.error('Failed to delete camera');
-    }
-  };
-
-  // Load cameras on component mount
-  useEffect(() => {
-    fetchCameras();
-  }, []);
+  const [isLogsModalVisible, setIsLogsModalVisible] = useState(false);
+  const [addCameraForm] = Form.useForm<AddCameraForm>();
 
   const handleRefresh = () => {
     fetchCameras();
@@ -150,29 +74,45 @@ const CameraManagement: React.FC = () => {
     addCameraForm.resetFields();
   };
 
-  const getStatusColor = (status: string) => {
+  const handleViewLogs = () => {
+    setIsLogsModalVisible(true);
+  };
+
+  const handleAddCameraSubmit = async (values: AddCameraForm) => {
+    await addCamera(values);
+    setIsAddModalVisible(false);
+    addCameraForm.resetFields();
+  };
+
+
+
+  const getStatusTag = (status: string) => {
     switch (status) {
-      case 'online':
-        return 'success';
-      case 'offline':
-        return 'error';
-      case 'maintenance':
-        return 'warning';
+      case 'success':
+        return <Tag color="success">Success</Tag>;
+      case 'warning':
+        return <Tag color="warning">Warning</Tag>;
+      case 'error':
+        return <Tag color="error">Error</Tag>;
       default:
-        return 'default';
+        return <Tag>Info</Tag>;
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    if (!status) {
-      return <Badge status="default" text="Unknown" />;
-    }
-    return (
-      <Badge 
-        status={getStatusColor(status) as any} 
-        text={status.charAt(0).toUpperCase() + status.slice(1)} 
-      />
-    );
+  const formatTimeAgo = (dateString: string) => {
+    const now = new Date();
+    const date = new Date(dateString);
+    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
+    
+    if (diffInMinutes < 1) return 'Just now';
+    if (diffInMinutes < 60) return `${diffInMinutes} minutes ago`;
+    if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)} hours ago`;
+    return `${Math.floor(diffInMinutes / 1440)} days ago`;
+  };
+
+  const formatDateTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleString();
   };
 
   const getActionMenu = (record: Camera) => (
@@ -259,7 +199,7 @@ const CameraManagement: React.FC = () => {
     {
       title: 'Actions',
       key: 'actions',
-      render: (text: string, record: Camera) => (
+      render: (_: unknown, record: Camera) => (
         <Space>
           <Tooltip title="View Camera">
             <Button 
@@ -327,6 +267,12 @@ const CameraManagement: React.FC = () => {
           >
             Add Camera
           </Button>
+          <Button 
+            icon={<FileTextOutlined />}
+            onClick={handleViewLogs}
+          >
+            View Logs
+          </Button>
         </Space>
       </div>
 
@@ -358,27 +304,58 @@ const CameraManagement: React.FC = () => {
         </Space>
       </Card>
 
-      {/* Camera table */}
-      <Card>
-        <Table
-          columns={columns}
-          dataSource={filteredData}
-          rowKey="camera_id"
-          loading={loading}
-          pagination={{
-            total: filteredData.length,
-            pageSize: 10,
-            showSizeChanger: true,
-            showQuickJumper: true,
-            showTotal: (total, range) => 
-              `${range[0]}-${range[1]} of ${total} cameras`,
-          }}
-          scroll={{ x: 1000 }}
-          locale={{
-            emptyText: 'No cameras found. Add your first camera to get started.',
-          }}
-        />
-      </Card>
+      {/* Camera table and recent activity */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Camera table */}
+        <div className="lg:col-span-2">
+          <Card>
+            <Table
+              columns={columns}
+              dataSource={filteredData}
+              rowKey="camera_id"
+              loading={loading}
+              pagination={{
+                total: filteredData.length,
+                pageSize: 10,
+                showSizeChanger: true,
+                showQuickJumper: true,
+                showTotal: (total, range) => 
+                  `${range[0]}-${range[1]} of ${total} cameras`,
+              }}
+              scroll={{ x: 1000 }}
+              locale={{
+                emptyText: 'No cameras found. Add your first camera to get started.',
+              }}
+            />
+          </Card>
+        </div>
+
+        {/* Recent Activity */}
+        <div className="lg:col-span-1">
+          <Card title="Recent Activity">
+            <List
+              dataSource={recentActivity}
+              renderItem={(item) => (
+                <List.Item key={item.camera_id}>
+                  <List.Item.Meta
+                    avatar={<PlusOutlined style={{ color: '#52c41a' }} />}
+                    title={
+                      <Space>
+                        <Text strong>{item.camera_name}</Text>
+                      </Space>
+                    }
+                    description={
+                      <Space direction="vertical" size={0}>
+                        <Text>{formatDateTime(item.created_at)}</Text>
+                      </Space>
+                    }
+                  />
+                </List.Item>
+              )}
+            />
+          </Card>
+        </div>
+      </div>
 
       {/* Add Camera Modal */}
       <Modal
@@ -393,7 +370,7 @@ const CameraManagement: React.FC = () => {
         <Form
           form={addCameraForm}
           layout="vertical"
-          onFinish={addCamera}
+          onFinish={handleAddCameraSubmit}
         >
           <Form.Item
             name="name"
@@ -431,6 +408,45 @@ const CameraManagement: React.FC = () => {
             <Input placeholder="Enter IP address (e.g., 192.168.1.100)" />
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* View Logs Modal */}
+      <Modal
+        title="Camera Creation Logs"
+        open={isLogsModalVisible}
+        onCancel={() => setIsLogsModalVisible(false)}
+        footer={[
+          <Button key="close" onClick={() => setIsLogsModalVisible(false)}>
+            Close
+          </Button>
+        ]}
+        width={800}
+      >
+        <List
+          dataSource={logs}
+          renderItem={(item) => (
+            <List.Item key={item.camera_id + item.created_at}>
+              <List.Item.Meta
+                avatar={<CalendarOutlined style={{ color: '#1890ff' }} />}
+                title={
+                  <Space>
+                    <Text strong>{item.camera_name}</Text>
+                    <Tag color="blue">Created</Tag>
+                  </Space>
+                }
+                description={
+                  <Space direction="vertical" size={0}>
+                    <Text>Camera ID: {item.camera_id}</Text>
+                    <Text>Created by: {item.created_by}</Text>
+                    <Text type="secondary">
+                      <ClockCircleOutlined /> {formatDateTime(item.created_at)}
+                    </Text>
+                  </Space>
+                }
+              />
+            </List.Item>
+          )}
+        />
       </Modal>
     </div>
   );
