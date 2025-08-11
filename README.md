@@ -73,21 +73,6 @@ npm start
 - **Responsive Grid**: Ant Design Row/Col system
 - **Accessibility**: Built-in ARIA support
 
-## 📁 Project Structure
-
-```
-src/
-├── components/          # React components
-│   ├── Dashboard.tsx   # Main dashboard with Ant Design stats
-│   ├── Login.tsx       # Ant Design authentication form
-│   ├── Layout.tsx      # Ant Design layout with sidebar
-│   └── CameraManagement.tsx # Ant Design table interface
-├── contexts/           # React contexts
-│   └── AuthContext.tsx # Authentication context
-├── App.tsx            # Main app component
-└── index.tsx          # Entry point
-```
-
 ## 🛠️ Technologies Used
 
 - **React 18** - Modern React with hooks
