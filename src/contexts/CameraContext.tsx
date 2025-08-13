@@ -40,7 +40,7 @@ interface CameraContextType {
   deleteCamera: (cameraId: string) => Promise<void>;
 }
 
-const API_BASE_URL = 'http://localhost:3636/api';
+const API_BASE_URL = 'https://localhost:3636/api';
 
 const CameraContext = createContext<CameraContextType | undefined>(undefined);
 
